@@ -1,0 +1,238 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+    <title>Bomberman</title>
+</head>
+<body>
+    <div class="noscript">
+        <h2 style="color: #ff0000">
+            Seems your browser doesn't support Javascript! Websockets rely on Javascript being enabled.
+            Please enable Javascript and reload this page!
+        </h2>
+    </div>
+    <div id="container" style="margin:0 auto; overflow: hidden;">
+        <div style="float: left; margin: 5px;">
+            <canvas id="playground" width="640" height="480"/>
+        </div>
+        <div id="players-state-container" style="float: left; margin: 5px;">
+            <div id="players-state"/>
+        </div>
+        <div id="console-container" style="float: left; margin: 5px;">
+            <div id="console"/>
+        </div>
+    </div>
+    <img style="display: none" id="ground" src="sprites/ground.png" />
+    <img style="display: none" id="aiplayer" src="sprites/aiplayer.png" />
+    <img style="display: none" id="aiplayer_dead" src="sprites/aiplayer_dead.png" />
+    <img style="display: none" id="player" src="sprites/player.png" />
+    <img style="display: none" id="player_dead" src="sprites/player_dead.png" />
+    <img style="display: none" id="barrier" src="sprites/barrier.png" />
+    <img style="display: none" id="bomb" src="sprites/bomb.png" />
+    <img style="display: none" id="bomb_dead" src="sprites/bomb_dead.png" />
+    <img style="display: none" id="fire" src="sprites/fire.png" />
+    <img style="display: none" id="wall" src="sprites/wall.png" />
+
+    <script type="application/javascript">
+
+        var Game = {};
+        Game.socket = null;
+        Game.players = {};
+        Game.gridSize = 40;
+        Game.xSize = 640;
+        Game.ySize = 480;
+
+        Game.players.entities = [];
+        Game.players.update = function(gameObject) {
+
+            var currentPlayer = null;
+            for (var playerNum in this.entities) {
+                player = this.entities[playerNum];
+                if (player.id == gameObject.id ) {
+                    currentPlayer = player;
+                    break;
+                }
+            }
+            if (!currentPlayer) {
+                currentPlayer = {};
+                currentPlayer.id = gameObject.id;
+                this.entities.push(currentPlayer);
+            }
+            currentPlayer.state = gameObject.state;
+            currentPlayer.score = gameObject.score;
+            currentPlayer.bombCount = gameObject.bombCount;
+        }
+        Game.players.draw = function() {
+
+            var playersState = document.getElementById('players-state');
+            while (playersState.childNodes.length > 0) {
+                playersState.removeChild(playersState.firstChild);
+            }
+            var table = document.createElement('table');
+            playersState.appendChild(table);
+            var row = table.insertRow();
+            row.insertCell(0).innerHTML = "id";
+            row.insertCell(1).innerHTML = "state";
+            row.insertCell(2).innerHTML = "score";
+            row.insertCell(3).innerHTML = "bombCount";
+            for (var playerNum in this.entities) {
+                var player = this.entities[playerNum];
+                var row = table.insertRow();
+                row.insertCell(0).innerHTML = player.id;
+                row.insertCell(1).innerHTML = player.state;
+                row.insertCell(2).innerHTML = player.score;
+                row.insertCell(3).innerHTML = player.bombCount;
+            }
+        }
+
+        Game.initialize = function() {
+            canvas = document.getElementById('playground');
+            if (!canvas.getContext) {
+                Console.log('Error: 2d canvas not supported by this browser.');
+                return;
+            }
+            this.context = canvas.getContext('2d');
+            window.addEventListener('keydown', function (e) {
+                var code = e.keyCode;
+                if (code &gt; 12 &amp;&amp; code &lt; 83) {
+                    switch (code) {
+                        case 13:
+                            Game.sendCommand('"command":"START"');
+                            break;
+                        case 27:
+                            Game.sendCommand('"command":"QUIT"');
+                            break;
+                        case 82:
+                            Game.sendCommand('"command":"GETMAP"');
+                            break;
+                        case 32:
+                            Game.sendCommand('"command":"ACT_BOMB"');
+                            break;
+                        case 37:
+                            Game.sendCommand('"command":"ACT_LEFT"');
+                            break;
+                        case 38:
+                            Game.sendCommand('"command":"ACT_UP"');
+                            break;
+                        case 39:
+                            Game.sendCommand('"command":"ACT_RIGHT"');
+                            break;
+                        case 40:
+                            Game.sendCommand('"command":"ACT_DOWN"');
+                            break;
+
+                    }
+                }
+            }, false);
+            Game.connect('ws://' + window.location.host + '/websocket/bomberman');
+        };
+
+        Game.sendCommand  = function(msg) {
+            Game.socket.send("{ " + msg + " }");
+            //Console.log('Sent: MSG ' + msg);
+        };
+
+        Game.draw = function() {
+            this.context.clearRect(0, 0, Game.xSize, Game.ySize);
+            var img = document.getElementById("ground");
+            for (var y = 0; y &lt; Game.ySize; y+=Game.gridSize) {
+                for (var x = 0; x &lt; Game.xSize; x+=Game.gridSize) {
+                    this.context.drawImage(img, x, y, Game.gridSize, Game.gridSize);
+                }
+            }
+        };
+
+        Game.updateGameObject = function(point, gameObject) {
+            var imgName = gameObject.type.toLowerCase();
+            if (gameObject.state == 'DEAD') {
+                imgName = imgName + "_dead";
+            }
+            var img = document.getElementById(imgName);
+            this.context.drawImage(img, point.x * Game.gridSize, point.y * Game.gridSize, Game.gridSize, Game.gridSize);
+
+            if (gameObject.type == 'Player' || gameObject.type == 'AIPlayer') {
+                Game.players.update(gameObject);
+                Game.players.draw();
+            }
+        };
+
+        Game.clearPoint = function(point) {
+            var img = document.getElementById("ground");
+            this.context.drawImage(img, point.x * Game.gridSize, point.y * Game.gridSize, Game.gridSize, Game.gridSize);
+        };
+
+        Game.connect = (function(host) {
+
+            Console.log('Connected to ');
+            Console.log('' + host);
+
+            if ('WebSocket' in window) {
+                Game.socket = new WebSocket(host);
+            } else if ('MozWebSocket' in window) {
+                Game.socket = new MozWebSocket(host);
+            } else {
+                Console.log('Error: WebSocket is not supported by this browser.');
+                return;
+            }
+
+            Game.socket.onopen = function () {
+                Console.log('Info: WebSocket connection opened.');
+                Console.log('Info: Press an Enter key to start new Game');
+                Console.log('      Press an Esc key to exit Game');
+                Console.log('      Press an R key to refresh the Map');
+                Console.log('      Use arrow keys to move');
+                Console.log('      Press space key to leave Bomb');
+                Game.draw();
+            };
+
+            Game.socket.onclose = function () {
+                Console.log('Info: WebSocket closed.');
+            };
+
+            Game.socket.onmessage = function (message) {
+                // _Potential_ security hole, consider using json lib to parse data in production.
+                //Console.log('MSG: ' + message);
+                if (message.data != '') {
+                    var gameMessage = eval('(' + message.data + ')');
+                    if (gameMessage.message != '') {
+                        var map = eval('(' + gameMessage.message + ')');
+                        for (var i = 0; i &lt; map.objects.length; i++) {
+                            var point = map.objects[i].point;
+                            if (("objects" in map.objects[i]) &amp;&amp; (map.objects[i].objects.length > 0)) {
+                                for (var j = 0; j &lt; map.objects[i].objects.length; j++) {
+                                    var gameObject = map.objects[i].objects[j];
+                                    Game.updateGameObject(point, gameObject);
+                                }
+                            } else {
+                                Game.clearPoint(point);
+                            }
+                        }
+                    }
+                }
+            };
+        });
+
+        var Console = {};
+
+        Console.log = (function(message) {
+            var console = document.getElementById('console');
+            var p = document.createElement('p');
+            p.style.wordWrap = 'break-word';
+            p.innerHTML = message;
+            console.appendChild(p);
+            while (console.childNodes.length > 14) {
+                console.removeChild(console.firstChild);
+            }
+            console.scrollTop = console.scrollHeight;
+        });
+
+        Game.initialize();
+
+        document.addEventListener("DOMContentLoaded", function() {
+            var noscripts = document.getElementsByClassName("noscript");
+            for (var i = 0; i &lt; noscripts.length; i++) {
+                noscripts[i].parentNode.removeChild(noscripts[i]);
+            }
+        }, false);
+    </script>
+</body>
+</html>
