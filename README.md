@@ -8,17 +8,17 @@ The tasks description:
 ----------------------
 
 	Create a game like the Bomberman. 
-	Games simulation have to be on server side totally.
+	Games simulation have to be on server side fully.
 	The Game is going with a player and three bots.
 
     Rules:
 	1. The Map
 
-		After the game start it have to generate the classical games field with 13x11 size according to the Dynablasters principle - 
+		After the game starts it has to generate the classical games field with 13x11 size according to the Dynablasters principle - 
 			cells with both non-pair indexes have to be filled with non-destroyable blocks, players placed on corners ( 
 			one real and three bots). All others cells have to be randomly filled with destroyable blocks.
 
-	2. The Player (and Bots) can:
+	2. For the Player (and Bots) it is allowed to:
 		
 		leabe a bomb
 		move on free cells
@@ -31,8 +31,8 @@ The tasks description:
 Realization description
 -----------------------
 	
-	The way of exchange data between a client and a server - is WebSockets
-	A Server expects from a clien commands as such json object
+	The way of exchange data between a client and a server is WebSockets
+	A Server expects from a client commands as such json object
 
 {
   "gameId":"1",        - game ID (it is not planning to realize a multiplayer mode for now, so a server uses the playerId as the gameId)
@@ -55,29 +55,29 @@ Realization description
 		ACT_DOWN
 		ACT_BOMB
 
-	After every game states changing (but not often then 250 ms), the server sends to a client json with "description" of changed points
-	In answer to the GETMAP command, the server sends to a client json with description of all poins on the Map.
+	After every game states changing (but not often then 250 ms), the server sends to a client json with the description of changed points
+	In answer to the GETMAP command, the server sends to a client json with the description of all points on the Map.
 
-	The description of the "point description" - is is one json-object with field "objects". 
-	The value of this field - is an array of json-object with two fields:
-		“point”- poin of the games Map (object with two field "X" and "Y" - maps coordinates. The top left corner - is point (0, 0))
-		“objects” - an array of "games objects", that plased on the poin
+	The description of the "point description" is is one json object with field "objects". 
+	The value of this field is an array of json objects with two fields:
+		“point”- point of the games Map (object with two field "X" and "Y" - maps coordinates. The top left corner - is point (0, 0))
+		“objects” - an array of "games objects", that are placed on the point
 	The Game object has such fields:
     
-		type  - there are a description below
-		state - there are a description below
+		type  - there is the description below
+		state - there is the description below
 
-    Objects with type "Bomb" and "Fire" have addiditional field
+    Objects with type "Bomb" and "Fire" have additional field
  
 		owner - (players (or bots) id, wich setted up it)
 
-	Objects with type "Player" and "AIPlayer" have addiditional field
+	Objects with type "Player" and "AIPlayer" have additional field
  
 		id
 		score
 		bombCount
 
-	An example of json point description
+	An example of json point description:
 
 		{
 		  "objects": [
@@ -137,11 +137,11 @@ Realization description
 		Wall        non-destroyable wall
 
 	All objects gave "state" with possible values "LIVE", "DEAD" or "REMOVE"	
-		Value "REMOVE" - is services value, so objects with that state have not to get on a client-side
+		Value "REMOVE" is the services value, so objects with that state have not to get on a client-side
 			
 		Objects, that could have the “DEAD” state:
-			Bomb - in this state it exist only 0.5 second, after that it destroing and File objects are upspringing on the bombs point 
-					(on the bombs point and on "bombs damage" points - 3 cells on vertical and horisontal)
+			Bomb - in this state it exist only 0.5 second, after that it destroying and File objects are upspringing on the bombs point 
+					(on the bombs point and on "bombs damage" points - 3 cells on vertical and horizontal)
 			Player (or AIPlayer) - in this players state all move and bomb setting commands does not processed and after 3 seconds
 					state changing to the "LIVE" value with re-initialization Players params.
 
